@@ -8,6 +8,7 @@ import numpy as np
 import os
 import subprocess
 import shutil
+import gc
 from typing import Generator, Optional
 from musetalk.utils.utils import datagen
 from musetalk.utils.blending import get_image_blending
@@ -161,11 +162,19 @@ def inference_stream(
                 
                 for res_frame in recon:
                     recon_queue.put(res_frame)
+                
+                # Clean up tensors after each batch
+                del whisper_batch, latent_batch, audio_feature_batch, pred_latents, recon
                     
             recon_queue.put(SENTINEL)
         except Exception as e:
             print(f"Prediction worker error: {e}")
             recon_queue.put(SENTINEL) # Ensure consumer doesn't hang
+        finally:
+            # Clean up after prediction worker completes
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            gc.collect()
 
     def blending_worker():
         idx = 0
@@ -208,6 +217,11 @@ def inference_stream(
     blend_thread.start()
     
     # Yield results
+    
+    # Clean up after streaming completes
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    gc.collect()
     while True:
         data = result_queue.get()
         if data is SENTINEL:

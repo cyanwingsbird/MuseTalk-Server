@@ -1,5 +1,6 @@
 import torch
 import os
+import gc
 from transformers import WhisperModel
 from musetalk.utils.utils import load_all_model
 from musetalk.utils.audio_processor import AudioProcessor
@@ -41,6 +42,11 @@ class ModelLoader:
             return
 
         print(f"Loading models on device: {self.device}...")
+        
+        # Clear cache before loading
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        gc.collect()
 
         # 1. Load VAE, UNet, PE
         self.vae, self.unet, self.pe = load_all_model(
@@ -55,6 +61,11 @@ class ModelLoader:
         self.vae.vae = self.vae.vae.half().to(self.device)
         self.unet.model = self.unet.model.half().to(self.device)
         self.timesteps = torch.tensor([0], device=self.device)
+        
+        # Clear cache after loading models
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        gc.collect()
 
         # 2. Audio Processor
         self.audio_processor = AudioProcessor(feature_extractor_path=conf.whisper_dir)
@@ -65,6 +76,11 @@ class ModelLoader:
         self.whisper = WhisperModel.from_pretrained(conf.whisper_dir)
         self.whisper = self.whisper.to(device=self.device, dtype=weight_dtype).eval()
         self.whisper.requires_grad_(False)
+        
+        # Clear cache after loading Whisper
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        gc.collect()
 
         # 4. Face Parsing
         if conf.version == "v15":
@@ -76,6 +92,11 @@ class ModelLoader:
             self.face_parsing = FaceParsing()
             
         print("All models loaded successfully.")
+        
+        # Final cache clear
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        gc.collect()
 
     def is_loaded(self) -> bool:
         return self.unet is not None

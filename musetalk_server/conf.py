@@ -8,6 +8,7 @@ class MuseTalkSettings(BaseSettings):
     Defaults match scripts/realtime_inference.py arguments.
     """
     version: str = "v15"
+    port: int = 8000
     ffmpeg_path: str = "ffmpeg"
     gpu_id: int = 0
     vae_type: str = "sd-vae"
@@ -21,7 +22,7 @@ class MuseTalkSettings(BaseSettings):
     fps: int = 25
     audio_padding_length_left: int = 2
     audio_padding_length_right: int = 2
-    batch_size: int = 20
+    batch_size: int = 4  # Reduced from 20 to prevent OOM errors
     output_vid_name: Optional[str] = None
     use_saved_coord: bool = False
     saved_coord: bool = False
@@ -32,7 +33,8 @@ class MuseTalkSettings(BaseSettings):
 
     class Config:
         env_prefix = "MUSETALK_"
-        env_file = ".env"
+        # Load .env from project root (one directory up from musetalk_server package)
+        env_file = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
 
 # Create a global instance
 conf = MuseTalkSettings()

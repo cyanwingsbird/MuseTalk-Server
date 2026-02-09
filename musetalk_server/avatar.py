@@ -20,17 +20,17 @@ import scripts.realtime_inference as realtime_module
 class ServerAvatar(Avatar):
     def __init__(self, avatar_id, video_path, bbox_shift, batch_size, preparation, args):
         super().__init__(avatar_id, video_path, bbox_shift, batch_size, preparation)
-        
+
     def init(self):
         # Access args via module
         args = realtime_module.args
-        
+
         # Logic adapted from Avatar.init
         if self.preparation:
             if os.path.exists(self.avatar_path):
                 print(f"Overwriting existing avatar: {self.avatar_id}")
                 shutil.rmtree(self.avatar_path)
-                
+
             print(f"Creating avatar: {self.avatar_id}")
             osmakedirs([self.avatar_path, self.full_imgs_path, self.video_out_path, self.mask_out_path])
             self.prepare_material()
@@ -68,10 +68,10 @@ class ServerAvatar(Avatar):
         pe = realtime_module.pe
         timesteps = realtime_module.timesteps
         args = realtime_module.args
-        
+
         print(f"Start inference stream for audio: {audio_path}")
         start_time = time.time()
-        
+
         whisper_input_features, librosa_length = audio_processor.get_audio_feature(audio_path, weight_dtype=weight_dtype)
         whisper_chunks = audio_processor.get_whisper_chunk(
             whisper_input_features,
@@ -83,16 +83,16 @@ class ServerAvatar(Avatar):
             audio_padding_length_left=args.audio_padding_length_left,
             audio_padding_length_right=args.audio_padding_length_right,
         )
-        
+
         print(f"Audio processing costs {(time.time() - start_time) * 1000}ms")
-        
+
         video_num = len(whisper_chunks)
         self.idx = 0
-        
+
         gen = datagen(whisper_chunks,
                       self.input_latent_list_cycle,
                       self.batch_size)
-        
+
         for i, (whisper_batch, latent_batch) in enumerate(gen):
             audio_feature_batch = pe(whisper_batch.to(device))
             latent_batch = latent_batch.to(device=device, dtype=unet.model.dtype)
@@ -102,26 +102,26 @@ class ServerAvatar(Avatar):
                                     encoder_hidden_states=audio_feature_batch).sample
             pred_latents = pred_latents.to(device=device, dtype=vae.vae.dtype)
             recon = vae.decode_latents(pred_latents)
-            
+
             for res_frame in recon:
                 if self.idx >= video_num:
                     break
-                    
+
                 bbox = self.coord_list_cycle[self.idx % (len(self.coord_list_cycle))]
                 ori_frame = copy.deepcopy(self.frame_list_cycle[self.idx % (len(self.frame_list_cycle))])
                 x1, y1, x2, y2 = bbox
-                
+
                 try:
                     res_frame = cv2.resize(res_frame.astype(np.uint8), (x2 - x1, y2 - y1))
                     mask = self.mask_list_cycle[self.idx % (len(self.mask_list_cycle))]
                     mask_crop_box = self.mask_coords_list_cycle[self.idx % (len(self.mask_coords_list_cycle))]
                     combine_frame = get_image_blending(ori_frame, res_frame, bbox, mask, mask_crop_box)
-                    
+
                     ret, buffer = cv2.imencode('.jpg', combine_frame)
                     yield buffer.tobytes()
-                    
+
                 except Exception as e:
                     print(f"Frame processing error: {e}")
                     pass
-                
+
                 self.idx += 1
