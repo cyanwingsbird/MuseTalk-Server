@@ -48,7 +48,6 @@ MuseTalk/results/
 MuseTalk/checkpoints/
 
 # Project Specific
-test/media/*
 !test/media/.gitkeep
 test/result.mp4
 test/server.log
