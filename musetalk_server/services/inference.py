@@ -89,6 +89,21 @@ def inference_stream(
     if not avatar.is_loaded:
         avatar.load_state()
 
+    # Validate avatar state before starting workers
+    required_lists = [
+        ("coord_list_cycle", avatar.coord_list_cycle),
+        ("frame_list_cycle", avatar.frame_list_cycle),
+        ("mask_list_cycle", avatar.mask_list_cycle),
+        ("mask_coords_list_cycle", avatar.mask_coords_list_cycle),
+    ]
+    for name, value in required_lists:
+        if not value:
+            raise ValueError(f"Avatar {avatar.avatar_id} has empty {name}; please re-preprocess.")
+
+    cycle_len = len(avatar.coord_list_cycle)
+    if any(len(lst) != cycle_len for _, lst in required_lists):
+        raise ValueError(f"Avatar {avatar.avatar_id} has inconsistent cycle lengths; please re-preprocess.")
+
     print(f"Start inference stream for audio: {audio_path}")
     start_time = time.time()
 
@@ -190,6 +205,9 @@ def inference_stream(
             # Blending logic
             # Use local copies of avatar lists to avoid any weird shared state issues (though lists are read-only here)
             cycle_len = len(avatar.coord_list_cycle)
+            if cycle_len == 0:
+                result_queue.put(SENTINEL)
+                break
             bbox = avatar.coord_list_cycle[idx % cycle_len]
             ori_frame = copy.deepcopy(avatar.frame_list_cycle[idx % cycle_len])
             x1, y1, x2, y2 = bbox

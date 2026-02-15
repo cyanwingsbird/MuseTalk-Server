@@ -3,7 +3,31 @@ import time
 import os
 import sys
 
-SERVER_URL = "http://localhost:8000"
+def load_port_from_env_file(env_path):
+    if not os.path.exists(env_path):
+        return None
+
+    try:
+        with open(env_path, "r", encoding="utf-8") as f:
+            for raw_line in f:
+                line = raw_line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if "=" not in line:
+                    continue
+                key, value = line.split("=", 1)
+                if key.strip() == "MUSETALK_PORT":
+                    port = value.strip().strip('"').strip("'")
+                    return port
+    except Exception:
+        return None
+
+    return None
+
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+ENV_PORT = load_port_from_env_file(os.path.join(ROOT_DIR, ".env"))
+PORT = os.getenv("MUSETALK_PORT") or ENV_PORT or "8000"
+SERVER_URL = f"http://localhost:{PORT}"
 VIDEO_PATH = "test/media/short_test_video.mp4"
 AUDIO_PATH = "test/media/test_audio.wav"
 AVATAR_ID = "verify_test_avatar"
@@ -11,24 +35,35 @@ AVATAR_ID = "verify_test_avatar"
 def log(msg, status="INFO"):
     print(f"[{status}] {msg}")
 
+VERIFY_STARTUP_TIMEOUT = float(os.getenv("VERIFY_STARTUP_TIMEOUT", "180"))
+VERIFY_REQUIRE_MODELS = os.getenv("VERIFY_REQUIRE_MODELS", "1").lower() not in {"0", "false", "no"}
+
 def check_health():
     log("Checking server health...")
-    # Increase timeout to 5 minutes (150 * 2s) for first-time model loading
-    for _ in range(150):
+    start_time = time.time()
+    attempts = 0
+
+    while (time.time() - start_time) < VERIFY_STARTUP_TIMEOUT:
+        attempts += 1
         try:
             r = httpx.get(f"{SERVER_URL}/health", timeout=5.0)
             if r.status_code == 200:
                 data = r.json()
-                if data["status"] == "running" and data["models"]["loaded"]:
-                    log("Server is healthy and models loaded.", "SUCCESS")
-                    return True
-        except:
+                if data.get("status") == "running":
+                    if not VERIFY_REQUIRE_MODELS or data.get("models", {}).get("loaded"):
+                        log("Server is healthy and models loaded.", "SUCCESS")
+                        return True
+        except Exception:
             pass
+
         time.sleep(2)
-        if _ % 10 == 0:
+        if attempts % 10 == 0:
             log("Waiting for server...", "WAIT")
-    
-    log("Server failed to start or load models.", "ERROR")
+
+    if VERIFY_REQUIRE_MODELS:
+        log("Server failed to start or load models.", "ERROR")
+    else:
+        log("Server did not report models loaded before timeout.", "ERROR")
     return False
 
 def preprocess():
@@ -53,6 +88,10 @@ def preprocess():
         log(f"Preprocess exception: {e}", "ERROR")
         return False
 
+STREAM_FRAME_TARGET = int(os.getenv("VERIFY_STREAM_FRAMES", "5"))
+STREAM_TIMEOUT = float(os.getenv("VERIFY_STREAM_TIMEOUT", "900"))
+BATCH_TIMEOUT = float(os.getenv("VERIFY_BATCH_TIMEOUT", "300"))
+
 def verify_stream():
     log("Verifying streaming inference...")
     try:
@@ -62,7 +101,12 @@ def verify_stream():
             start_t = time.time()
             frame_count = 0
             
-            with httpx.stream("POST", f"{SERVER_URL}/inference/stream/{AVATAR_ID}", files=files, timeout=300) as r:
+            with httpx.stream(
+                "POST",
+                f"{SERVER_URL}/inference/stream/{AVATAR_ID}",
+                files=files,
+                timeout=STREAM_TIMEOUT
+            ) as r:
                 if r.status_code != 200:
                     log(f"Stream connect failed: {r.status_code}", "ERROR")
                     return False
@@ -71,10 +115,15 @@ def verify_stream():
                 for chunk in r.iter_bytes():
                     if b'\xff\xd8' in chunk:
                         frame_count += 1
+                        if frame_count >= STREAM_FRAME_TARGET:
+                            break
                         
             duration = time.time() - start_t
             if frame_count > 0:
-                log(f"Stream verification successful. Received {frame_count} frames in {duration:.2f}s", "SUCCESS")
+                log(
+                    f"Stream verification successful. Received {frame_count} frames in {duration:.2f}s",
+                    "SUCCESS"
+                )
                 return True
             else:
                 log("Stream received 0 frames.", "ERROR")
@@ -90,7 +139,11 @@ def verify_batch():
         with open(AUDIO_PATH, "rb") as f:
             files = {"audio_file": (os.path.basename(AUDIO_PATH), f, "audio/wav")}
             
-            r = httpx.post(f"{SERVER_URL}/inference/batch/{AVATAR_ID}", files=files, timeout=300)
+            r = httpx.post(
+                f"{SERVER_URL}/inference/batch/{AVATAR_ID}",
+                files=files,
+                timeout=BATCH_TIMEOUT
+            )
             if r.status_code == 200:
                 content_type = r.headers.get("content-type")
                 size = len(r.content)

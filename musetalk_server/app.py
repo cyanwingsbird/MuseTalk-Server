@@ -47,4 +47,4 @@ app.include_router(inference.router, tags=["Inference"])
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("musetalk_server.app:app", host="0.0.0.0", port=settings.port, reload=False)
+    uvicorn.run("musetalk_server.app:app", host=settings.host, port=settings.port, reload=False)

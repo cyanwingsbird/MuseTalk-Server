@@ -56,10 +56,15 @@ class ModelLoader:
             device=self.device
         )
 
-        # Move to device and half precision
-        self.pe = self.pe.half().to(self.device)
-        self.vae.vae = self.vae.vae.half().to(self.device)
-        self.unet.model = self.unet.model.half().to(self.device)
+        # Move to device and half precision (CUDA only)
+        if self.device.type == "cuda":
+            self.pe = self.pe.half().to(self.device)
+            self.vae.vae = self.vae.vae.half().to(self.device)
+            self.unet.model = self.unet.model.half().to(self.device)
+        else:
+            self.pe = self.pe.to(self.device)
+            self.vae.vae = self.vae.vae.to(self.device)
+            self.unet.model = self.unet.model.to(self.device)
         self.timesteps = torch.tensor([0], device=self.device)
         
         # Clear cache after loading models

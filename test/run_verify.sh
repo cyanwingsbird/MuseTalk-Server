@@ -7,6 +7,9 @@ echo "=== Starting MuseTalk Verification ==="
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 MUSETALK_DIR="$ROOT_DIR/MuseTalk"
 
+# Use active environment python (avoid absolute paths)
+PYTHON_BIN="${PYTHON:-python}"
+
 # Set PYTHONPATH to include both MuseTalk (for musetalk module) and root (for musetalk_server)
 export PYTHONPATH="$MUSETALK_DIR:$ROOT_DIR:$PYTHONPATH"
 
@@ -17,7 +20,7 @@ rm -f "$ROOT_DIR/test/result.mp4"
 # Start Server FROM MuseTalk directory (required for hardcoded relative paths in MuseTalk)
 echo "Starting server in background from MuseTalk directory..."
 cd "$MUSETALK_DIR"
-/home/andy/miniconda3/envs/MuseTalk/bin/python -u -m musetalk_server.app > "$ROOT_DIR/test/server.log" 2>&1 &
+"$PYTHON_BIN" -u -m musetalk_server.app > "$ROOT_DIR/test/server.log" 2>&1 &
 SERVER_PID=$!
 echo "Server PID: $SERVER_PID"
 
@@ -29,8 +32,10 @@ sleep 2
 
 # Run Verification Script
 echo "Running verification client..."
-/home/andy/miniconda3/envs/MuseTalk/bin/python -u test/verify_server.py
+set +e
+"$PYTHON_BIN" -u test/verify_server.py
 RET=$?
+set -e
 
 if [ $RET -eq 0 ]; then
     echo "=== Verification SUCCESS ==="

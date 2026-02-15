@@ -44,7 +44,15 @@ async def preprocess_avatar(
         
         # Run preprocessing
         preprocessor = AvatarPreprocessor(models['vae'], models['face_parsing'])
-        preprocessor.process_avatar(video_path, avatar_id, bbox_shift)
+        preprocessor.process_avatar(
+            video_path,
+            avatar_id,
+            bbox_shift,
+            results_dir=settings.result_dir,
+            extra_margin=settings.extra_margin,
+            parsing_mode=settings.parsing_mode,
+            version=settings.version
+        )
         
         # Load the avatar into memory to verify it works and cache it
         avatar = Avatar(avatar_id, results_dir=settings.result_dir, version=settings.version)

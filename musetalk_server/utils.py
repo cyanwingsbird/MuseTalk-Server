@@ -28,14 +28,19 @@ def load_models(args):
     )
     timesteps = torch.tensor([0], device=device)
 
-    # Move to device and half precision
-    try:
-        pe = pe.half().to(device)
-        vae.vae = vae.vae.half().to(device)
-        unet.model = unet.model.half().to(device)
-    except Exception as e:
-        print(f"Warning: Failed to convert to half precision or move to device: {e}")
-        # Fallback if needed, but MuseTalk expects half
+    # Move to device and half precision (CUDA only)
+    if device.type == "cuda":
+        try:
+            pe = pe.half().to(device)
+            vae.vae = vae.vae.half().to(device)
+            unet.model = unet.model.half().to(device)
+        except Exception as e:
+            print(f"Warning: Failed to convert to half precision or move to device: {e}")
+            # Fallback if needed, but MuseTalk expects half
+    else:
+        pe = pe.to(device)
+        vae.vae = vae.vae.to(device)
+        unet.model = unet.model.to(device)
 
     print("Loading Whisper...")
     audio_processor = AudioProcessor(feature_extractor_path=args.whisper_dir)

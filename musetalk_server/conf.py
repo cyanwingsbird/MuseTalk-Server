@@ -8,6 +8,7 @@ class MuseTalkSettings(BaseSettings):
     Defaults match scripts/realtime_inference.py arguments.
     """
     version: str = "v15"
+    host: str = "0.0.0.0"
     port: int = 8000
     ffmpeg_path: str = "ffmpeg"
     gpu_id: int = 0

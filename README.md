@@ -20,6 +20,13 @@ cd muse-server
 ### Running the Server
 **CRITICAL:** You must run the server from the `MuseTalk` directory due to upstream path dependencies.
 
+Linux quick start:
+```bash
+./start_server.sh
+```
+
+Manual start (equivalent):
+
 ```bash
 # 1. Activate environment
 conda activate MuseTalk
@@ -71,6 +78,7 @@ Configuration is managed in `musetalk_server/conf.py`. You can override settings
 
 | Variable | Default | Description |
 |----------|---------|-------------|
+| `MUSETALK_HOST` | `0.0.0.0` | Server bind host (set to 0.0.0.0 for LAN access) |
 | `MUSETALK_PORT` | `8000` | Server port |
 | `MUSETALK_GPU_ID` | `0` | CUDA device ID |
 | `MUSETALK_WORKERS` | `1` | Number of Uvicorn workers |

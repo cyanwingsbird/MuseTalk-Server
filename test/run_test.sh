@@ -1,7 +1,10 @@
 #!/bin/bash
+# Use active environment python (avoid absolute paths)
+PYTHON_BIN="${PYTHON:-python}"
+
 # Start server in background
 echo "Starting server..."
-/home/andy/miniconda3/envs/MuseTalk/bin/python -m musetalk_server.app > server.log 2>&1 &
+"$PYTHON_BIN" -m musetalk_server.app > server.log 2>&1 &
 SERVER_PID=$!
 echo "Server PID: $SERVER_PID"
 
@@ -17,7 +20,7 @@ done
 
 # Run client
 echo "Running client..."
-/home/andy/miniconda3/envs/MuseTalk/bin/python client_example.py
+"$PYTHON_BIN" client_example.py
 
 # Cleanup
 echo "Killing server..."

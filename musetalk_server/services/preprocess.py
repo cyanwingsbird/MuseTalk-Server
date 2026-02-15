@@ -96,18 +96,23 @@ def process_avatar(
     # Check if exists
     if os.path.exists(base_path):
         if not force_recreation:
-            # Check consistency
+            # Check consistency and required outputs
+            required_paths = [coords_path, latents_out_path, mask_coords_path, avatar_info_path]
+            has_required = all(os.path.exists(p) for p in required_paths)
+            has_masks = os.path.isdir(mask_out_path) and len(os.listdir(mask_out_path)) > 0
+            has_frames = os.path.isdir(full_imgs_path) and len(os.listdir(full_imgs_path)) > 0
+
             if os.path.exists(avatar_info_path):
                 with open(avatar_info_path, "r") as f:
                     existing_info = json.load(f)
-                if existing_info.get('bbox_shift') == bbox_shift:
+                if existing_info.get('bbox_shift') == bbox_shift and has_required and has_masks and has_frames:
                     print(f"Avatar {avatar_id} already exists with matching bbox_shift. Skipping.")
                     return
                 else:
-                    print(f"Avatar {avatar_id} exists but bbox_shift mismatch. Recreating...")
+                    print(f"Avatar {avatar_id} exists but is incomplete or bbox_shift mismatch. Recreating...")
             else:
-                 print(f"Avatar {avatar_id} exists but info missing. Recreating...")
-        
+                print(f"Avatar {avatar_id} exists but info missing. Recreating...")
+
         # Clean up
         shutil.rmtree(base_path)
 
@@ -138,34 +143,45 @@ def process_avatar(
     coord_list, frame_list = get_landmark_and_bbox(input_img_list, bbox_shift)
     
     input_latent_list = []
+    valid_coord_list = []
+    valid_frame_list = []
     coord_placeholder = (0.0, 0.0, 0.0, 0.0)
 
     # 3. Process Frames (Crop -> Resize -> VAE Latents)
     print("Processing latents...")
-    idx = -1
     for bbox, frame in zip(coord_list, frame_list):
-        idx += 1
         if bbox == coord_placeholder:
             continue
-            
+
         x1, y1, x2, y2 = bbox
         if version == "v15":
             y2 = y2 + extra_margin
             y2 = min(y2, frame.shape[0])
-            coord_list[idx] = [x1, y1, x2, y2]
+        adjusted_bbox = [x1, y1, x2, y2]
 
         crop_frame = frame[y1:y2, x1:x2]
         resized_crop_frame = cv2.resize(crop_frame, (256, 256), interpolation=cv2.INTER_LANCZOS4)
-        
+
         # Calculate latents
         # Assuming vae.get_latents_for_unet exists and handles device transfer if needed
         latents = vae.get_latents_for_unet(resized_crop_frame)
         input_latent_list.append(latents)
+        valid_coord_list.append(adjusted_bbox)
+        valid_frame_list.append(frame)
+
+    if not valid_coord_list:
+        raise ValueError("No valid face detections found; cannot create avatar.")
 
     # 4. Cycle Lists (Forward + Backward for smooth looping)
-    frame_list_cycle = frame_list + frame_list[::-1]
-    coord_list_cycle = coord_list + coord_list[::-1]
+    frame_list_cycle = valid_frame_list + valid_frame_list[::-1]
+    coord_list_cycle = valid_coord_list + valid_coord_list[::-1]
     input_latent_list_cycle = input_latent_list + input_latent_list[::-1]
+
+    # Replace stored frames with the cycled list so load_state matches lengths
+    for filename in os.listdir(full_imgs_path):
+        os.remove(os.path.join(full_imgs_path, filename))
+    for idx, frame in enumerate(frame_list_cycle):
+        cv2.imwrite(os.path.join(full_imgs_path, f"{idx:08d}.png"), frame)
     
     mask_coords_list_cycle = []
     mask_list_cycle = []
