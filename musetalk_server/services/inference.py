@@ -9,7 +9,7 @@ import os
 import subprocess
 import shutil
 import gc
-from typing import Generator, Optional
+from typing import Generator
 from musetalk.utils.utils import datagen
 from musetalk.utils.blending import get_image_blending
 
@@ -137,32 +137,11 @@ def inference_stream(
     result_queue = queue.Queue(maxsize=batch_size * 4)
     SENTINEL = object()
     
-    # We need to ensure models are used safely if multiple requests hit at once.
-    # PyTorch inference on same model from multiple threads can be tricky or blocking.
-    # The models are shared (passed in). 
-    # To handle multiple sources correctly without race conditions on model internal state (if any),
-    # we might need a lock. However, PyTorch models are generally thread-safe for inference 
-    # if no internal state is mutated. 
-    # Whisper and Unet/VAE should be stateless during inference.
-    # BUT, to be safe and avoid OOM or weirdness, we can use a model lock or semaphore if needed.
-    # For now, we assume statelessness is fine, but we'll add a check.
-    
-    # Actually, datagen uses `models.pe` and `models.unet`.
-    # Let's ensure no side effects. `pe` is likely a functional module.
-    
-    inference_lock = threading.Lock() # Optional: if we want to serialize GPU access per request
-
     def prediction_worker():
-        # Ideally, we lock mainly the GPU heavy parts if we want to prevent OOM from too many concurrent reqs
-        # or rely on CUDA scheduling.
-        
         gen = datagen(whisper_chunks, avatar.input_latent_list_cycle, batch_size)
-        
+
         try:
             for i, (whisper_batch, latent_batch) in enumerate(gen):
-                # We can use a lock here if needed for strict serialization
-                # with inference_lock: 
-                
                 audio_feature_batch = models.pe(whisper_batch.to(device))
                 latent_batch = latent_batch.to(device=device, dtype=weight_dtype)
 
@@ -235,19 +214,19 @@ def inference_stream(
     blend_thread.start()
     
     # Yield results
-    
-    # Clean up after streaming completes
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
-    gc.collect()
     while True:
         data = result_queue.get()
         if data is SENTINEL:
             break
         yield data
-        
+
     pred_thread.join()
     blend_thread.join()
+
+    # Clean up after all threads have finished
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    gc.collect()
 
 
 def inference_batch(

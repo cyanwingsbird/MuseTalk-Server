@@ -7,7 +7,6 @@ import pickle
 import json
 import numpy as np
 from tqdm import tqdm
-from typing import Optional, Tuple, List
 
 # Core imports (assuming these exist in the environment as per existing scripts)
 from musetalk.utils.preprocessing import get_landmark_and_bbox, read_imgs

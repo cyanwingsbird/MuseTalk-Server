@@ -1,4 +1,6 @@
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks
+import re
+
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from musetalk_server.conf import conf as settings
 from musetalk_server.core.model_loader import model_loader
 from musetalk_server.core.avatar import Avatar
@@ -6,11 +8,16 @@ from musetalk_server.services.preprocess import AvatarPreprocessor
 from musetalk_server.schemas.api import PreprocessResponse, AvatarInfo
 import shutil
 import os
-import json
 import traceback
 
 router = APIRouter()
 avatars = {} # In-memory cache for loaded avatars
+
+_AVATAR_ID_PATTERN = re.compile(r'^[a-zA-Z0-9_\-]{1,64}$')
+
+def validate_avatar_id(avatar_id: str) -> None:
+    if not _AVATAR_ID_PATTERN.match(avatar_id):
+        raise HTTPException(status_code=400, detail="Invalid avatar_id: must be 1-64 alphanumeric, hyphen, or underscore characters.")
 
 @router.get("/avatars", response_model=list[str])
 def list_avatars():
@@ -30,6 +37,8 @@ async def preprocess_avatar(
     Upload a video and preprocess it to create an avatar.
     This is a blocking operation for simplicity, but in production should be backgrounded.
     """
+    validate_avatar_id(avatar_id)
+
     # Save uploaded video
     video_dir = os.path.join(settings.result_dir, "uploads")
     os.makedirs(video_dir, exist_ok=True)
@@ -75,6 +84,8 @@ async def preprocess_avatar(
 
 def get_avatar(avatar_id: str) -> Avatar:
     """Helper to get avatar from cache or load from disk"""
+    validate_avatar_id(avatar_id)
+
     if avatar_id in avatars:
         return avatars[avatar_id]
     

@@ -1,5 +1,4 @@
 from pydantic_settings import BaseSettings
-from typing import Optional
 import os
 
 class MuseTalkSettings(BaseSettings):
@@ -16,7 +15,6 @@ class MuseTalkSettings(BaseSettings):
     unet_config: str = "./models/musetalk/musetalk.json"
     unet_model_path: str = "./models/musetalk/pytorch_model.bin"
     whisper_dir: str = "./models/whisper"
-    inference_config: str = "./configs/inference/realtime.yaml"
     bbox_shift: int = 0
     result_dir: str = "./results"
     extra_margin: int = 10
@@ -24,16 +22,13 @@ class MuseTalkSettings(BaseSettings):
     audio_padding_length_left: int = 2
     audio_padding_length_right: int = 2
     batch_size: int = 4  # Reduced from 20 to prevent OOM errors
-    output_vid_name: Optional[str] = None
-    use_saved_coord: bool = False
-    saved_coord: bool = False
     parsing_mode: str = "jaw"
     left_cheek_width: int = 90
     right_cheek_width: int = 90
-    skip_save_images: bool = False
 
     class Config:
         env_prefix = "MUSETALK_"
+        extra = "ignore"
         # Load .env from project root (one directory up from musetalk_server package)
         env_file = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
 
