@@ -1,27 +1,18 @@
 #!/bin/bash
-# Use active environment python (avoid absolute paths)
+set -e
+
+# Get the root directory
+ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+MUSETALK_DIR="$ROOT_DIR/MuseTalk"
 PYTHON_BIN="${PYTHON:-python}"
 
-# Start server in background
-echo "Starting server..."
-"$PYTHON_BIN" -m musetalk_server.app > server.log 2>&1 &
-SERVER_PID=$!
-echo "Server PID: $SERVER_PID"
+# Set PYTHONPATH
+export PYTHONPATH="$MUSETALK_DIR:$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}"
 
-# Wait for server to be ready
-echo "Waiting for server to start..."
-for i in {1..30}; do
-    if grep -q "Application startup complete" server.log; then
-        echo "Server started!"
-        break
-    fi
-    sleep 2
-done
+echo "Running unit tests..."
+echo "  PYTHONPATH: $PYTHONPATH"
 
-# Run client
-echo "Running client..."
-"$PYTHON_BIN" client_example.py
+# Run from MuseTalk dir so upstream imports resolve
+cd "$MUSETALK_DIR"
 
-# Cleanup
-echo "Killing server..."
-kill $SERVER_PID
+"$PYTHON_BIN" -m pytest "$ROOT_DIR/musetalk_server/tests/test_api.py" -v "$@"

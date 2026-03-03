@@ -122,6 +122,33 @@ class TestStreamInference:
         )
         assert response.status_code in (404, 405, 307)
 
+    @pytest.mark.parametrize("bad_batch_size", [0, -1, 33, 100])
+    def test_rejects_invalid_batch_size(self, bad_batch_size):
+        """batch_size outside 1-32 range is rejected by validation."""
+        response = client.post(
+            "/inference/stream/nonexistent_avatar",
+            data={"batch_size": str(bad_batch_size)},
+            files={"audio_file": ("test.wav", b"fake audio", "audio/wav")},
+        )
+        assert response.status_code == 422
+
+    def test_accepts_valid_batch_size(self):
+        """Valid batch_size passes validation (404 because avatar doesn't exist)."""
+        response = client.post(
+            "/inference/stream/nonexistent_avatar",
+            data={"batch_size": "2"},
+            files={"audio_file": ("test.wav", b"fake audio", "audio/wav")},
+        )
+        assert response.status_code == 404
+
+    def test_batch_size_optional(self):
+        """Omitting batch_size is valid (404 because avatar doesn't exist)."""
+        response = client.post(
+            "/inference/stream/nonexistent_avatar",
+            files={"audio_file": ("test.wav", b"fake audio", "audio/wav")},
+        )
+        assert response.status_code == 404
+
 
 # ---------------------------------------------------------------------------
 # Inference - Batch (missing avatar & validation)
@@ -156,3 +183,30 @@ class TestBatchInference:
             files={"audio_file": ("test.wav", b"fake audio", "audio/wav")},
         )
         assert response.status_code in (404, 405, 307)
+
+    @pytest.mark.parametrize("bad_batch_size", [0, -1, 33, 100])
+    def test_rejects_invalid_batch_size(self, bad_batch_size):
+        """batch_size outside 1-32 range is rejected by validation."""
+        response = client.post(
+            "/inference/batch/nonexistent_avatar",
+            data={"batch_size": str(bad_batch_size)},
+            files={"audio_file": ("test.wav", b"fake audio", "audio/wav")},
+        )
+        assert response.status_code == 422
+
+    def test_accepts_valid_batch_size(self):
+        """Valid batch_size passes validation (404 because avatar doesn't exist)."""
+        response = client.post(
+            "/inference/batch/nonexistent_avatar",
+            data={"batch_size": "4"},
+            files={"audio_file": ("test.wav", b"fake audio", "audio/wav")},
+        )
+        assert response.status_code == 404
+
+    def test_batch_size_optional(self):
+        """Omitting batch_size is valid (404 because avatar doesn't exist)."""
+        response = client.post(
+            "/inference/batch/nonexistent_avatar",
+            files={"audio_file": ("test.wav", b"fake audio", "audio/wav")},
+        )
+        assert response.status_code == 404

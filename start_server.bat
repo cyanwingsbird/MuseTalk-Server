@@ -1,32 +1,23 @@
 @echo off
-setlocal enabledelayedexpansion
+setlocal
 
-echo [INFO] Starting MuseTalk Server...
+set "ROOT_DIR=%~dp0"
+set "MUSETALK_DIR=%ROOT_DIR%MuseTalk"
 
-:: Get project root directory
-set "PROJECT_ROOT=%~dp0"
-cd /d "%PROJECT_ROOT%"
-
-:: Check if venv exists
-if not exist "venv\Scripts\python.exe" (
-    echo [ERROR] Virtual environment not found at %PROJECT_ROOT%venv
-    echo [INFO] Please run the setup/verification script first.
-    pause
+if not exist "%MUSETALK_DIR%" (
+    echo ERROR: MuseTalk directory not found at %MUSETALK_DIR%
+    echo Ensure the MuseTalk submodule is initialized.
     exit /b 1
 )
 
-:: Set PYTHONPATH to include project root (.) and MuseTalk submodule (./MuseTalk)
-set "PYTHONPATH=%PROJECT_ROOT%;%PROJECT_ROOT%MuseTalk"
-echo [INFO] PYTHONPATH set to: %PYTHONPATH%
+:: Set PYTHONPATH to include both MuseTalk and project root
+set "PYTHONPATH=%MUSETALK_DIR%;%ROOT_DIR%;%PYTHONPATH%"
 
-:: Change directory to MuseTalk so relative model paths resolve correctly
-cd /d "%PROJECT_ROOT%MuseTalk"
-echo [INFO] Working Directory: %CD%
+:: Must run from MuseTalk directory (upstream code uses hardcoded relative paths)
+cd /d "%MUSETALK_DIR%"
 
-:: Run the server using the venv python
-echo [INFO] Server is starting... (This may take nearly a minute to load models)
-echo [INFO] Please keep this window open.
-"%PROJECT_ROOT%venv\Scripts\python.exe" -m musetalk_server.app
+echo Starting MuseTalk Server...
+echo   CWD:        %CD%
+echo   PYTHONPATH:  %PYTHONPATH%
 
-endlocal
-pause
+python -m musetalk_server.app %*

@@ -54,3 +54,5 @@ test/server.log
 
 # Sisyphus (Agent work files)
 .sisyphus/
+
+CLAUDE.md

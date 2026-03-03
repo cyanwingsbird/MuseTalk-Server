@@ -26,11 +26,12 @@ class InferenceModels:
         self.timesteps = timesteps
 
 class InferenceService:
-    def __init__(self, models: dict, settings):
+    def __init__(self, models: dict, settings, batch_size_override: int | None = None):
         """
         Args:
             models: Dict containing loaded models from ModelLoader
             settings: Configuration object
+            batch_size_override: Optional per-request batch size (falls back to settings.batch_size)
         """
         self.models = InferenceModels(
             vae=models['vae'],
@@ -42,6 +43,7 @@ class InferenceService:
         )
         self.device = models['device'] if 'device' in models else torch.device('cuda')
         self.settings = settings
+        self.batch_size = batch_size_override if batch_size_override is not None else settings.batch_size
 
     def inference_stream(self, avatar, audio_path: str) -> Generator[bytes, None, None]:
         return inference_stream(
@@ -49,7 +51,7 @@ class InferenceService:
             audio_path=audio_path,
             models=self.models,
             fps=self.settings.fps,
-            batch_size=self.settings.batch_size,
+            batch_size=self.batch_size,
             audio_padding_left=self.settings.audio_padding_length_left,
             audio_padding_right=self.settings.audio_padding_length_right,
             device=self.device
@@ -68,7 +70,7 @@ class InferenceService:
             output_path=output_path,
             models=self.models,
             fps=self.settings.fps,
-            batch_size=self.settings.batch_size,
+            batch_size=self.batch_size,
             ffmpeg_path=self.settings.ffmpeg_path
         )
 
@@ -235,7 +237,7 @@ def inference_batch(
     output_path: str,
     models: InferenceModels,
     fps: int = 25,
-    batch_size: int = 8,
+    batch_size: int = 4,
     ffmpeg_path: str = "ffmpeg"
 ) -> str:
     """

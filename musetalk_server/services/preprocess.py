@@ -5,11 +5,10 @@ import cv2
 import torch
 import pickle
 import json
-import numpy as np
 from tqdm import tqdm
 
 # Core imports (assuming these exist in the environment as per existing scripts)
-from musetalk.utils.preprocessing import get_landmark_and_bbox, read_imgs
+from musetalk.utils.preprocessing import get_landmark_and_bbox
 from musetalk.utils.blending import get_image_prepare_material
 
 class AvatarPreprocessor:

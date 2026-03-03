@@ -1,52 +1,26 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/bash
+set -e
 
-echo "[INFO] Starting MuseTalk Server..."
+# Get the project root directory
+ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
+MUSETALK_DIR="$ROOT_DIR/MuseTalk"
 
-# Get project root directory (directory containing this script)
-PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$PROJECT_ROOT"
-
-# Activate conda environment (default: MuseTalk)
-CONDA_ENV_NAME="${MUSETALK_CONDA_ENV:-MuseTalk}"
-
-if ! command -v conda >/dev/null 2>&1; then
-    echo "[ERROR] conda command not found. Please install conda/miniconda first."
+if [ ! -d "$MUSETALK_DIR" ]; then
+    echo "ERROR: MuseTalk directory not found at $MUSETALK_DIR"
+    echo "Ensure the MuseTalk submodule is initialized."
     exit 1
 fi
 
-CONDA_BASE="$(conda info --base)"
-if [[ ! -f "$CONDA_BASE/etc/profile.d/conda.sh" ]]; then
-    echo "[ERROR] Could not find conda initialization script at $CONDA_BASE/etc/profile.d/conda.sh"
-    exit 1
-fi
+# Set PYTHONPATH to include both MuseTalk (for musetalk module) and root (for musetalk_server)
+export PYTHONPATH="$MUSETALK_DIR:$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}"
 
-source "$CONDA_BASE/etc/profile.d/conda.sh"
+# Must run from MuseTalk directory (upstream code uses hardcoded relative paths)
+cd "$MUSETALK_DIR"
 
-if [[ "${CONDA_DEFAULT_ENV:-}" != "$CONDA_ENV_NAME" ]]; then
-    echo "[INFO] Activating conda environment: $CONDA_ENV_NAME"
-    conda activate "$CONDA_ENV_NAME"
-fi
+echo "Starting MuseTalk Server..."
+echo "  CWD:        $(pwd)"
+echo "  PYTHONPATH:  $PYTHONPATH"
 
+# Use active environment python
 PYTHON_BIN="${PYTHON:-python}"
-if ! command -v "$PYTHON_BIN" >/dev/null 2>&1; then
-    echo "[ERROR] Python executable not found after activating conda environment."
-    exit 1
-fi
-
-# Set PYTHONPATH to include project root and MuseTalk submodule
-if [[ -n "${PYTHONPATH:-}" ]]; then
-    export PYTHONPATH="$PROJECT_ROOT:$PROJECT_ROOT/MuseTalk:$PYTHONPATH"
-else
-    export PYTHONPATH="$PROJECT_ROOT:$PROJECT_ROOT/MuseTalk"
-fi
-echo "[INFO] PYTHONPATH set to: $PYTHONPATH"
-
-# Change directory to MuseTalk so relative model paths resolve correctly
-cd "$PROJECT_ROOT/MuseTalk"
-echo "[INFO] Working Directory: $PWD"
-
-# Run the server using the venv python
-echo "[INFO] Server is starting... (This may take nearly a minute to load models)"
-echo "[INFO] Please keep this terminal open."
-"$PYTHON_BIN" -m musetalk_server.app
+exec "$PYTHON_BIN" -m musetalk_server.app "$@"
